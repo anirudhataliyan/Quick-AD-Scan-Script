@@ -1,20 +1,45 @@
 from src import connect_to_ad
 from src import search_directory
 from src import save_results
+from src import ldap_scanner
+import subprocess
+
+def run_ntlm_scanner(target, target_file=None, hashes=None):
+    command = ["python", "ntlm-scanner.py", target]
+
+    if target_file:
+        command.extend(["-target-file", target_file])
+    if hashes:
+        command.extend(["-hashes", hashes])
+
+    try:
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode == 0:
+            print("NTLM Scanner executed successfully.")
+            return result.stdout
+        else:
+            print(f"Error running NTLM Scanner: {result.stderr}")
+            return None
+    except Exception as e:
+        print(f"Failed to execute NTLM Scanner: {e}")
+        return None
 
 def main():
     print("Welcome to Active Directory Enumerator\n")
     server_address = input("Enter the Active Directory server address (e.g., ldap://domain.com): ")
     username = input("Enter the username (e.g., DOMAIN\\\\User): ")
     password = input("Enter the password: ")
+
     try:
         print("\nConnecting to the Active Directory...")
         conn = connect_to_ad(server_address, username, password)
-        print("Connection successful!\n")
+        print("\nConnection successful!\n")
     except Exception as e:
         print(f"Failed to connect: {e}")
         return
+
     search_base = input("Enter the search base (e.g., DC=domain,DC=com): ")
+    
     print("\nEnumerating objects in the directory...")
 
     try:
@@ -56,7 +81,22 @@ def main():
         else:
             print("Invalid choice. No output saved.")
 
+        run_ntlm = input("\nDo you want to run the NTLM Scanner? (yes/no): ").strip().lower()
+        if run_ntlm == 'yes':
+            target = input("Enter the target (e.g., an IP address or domain): ")
+            target_file = input("Enter the target file path (or press Enter to skip): ").strip() or None
+            hashes = input("Enter the hashes (LMHASH:NTHASH format) or press Enter to skip: ").strip() or None
+            ntlm_results = run_ntlm_scanner(target, target_file, hashes)
+
+            if ntlm_results:
+                ntlm_output_file = "ntlm_scanner_output.txt"
+                with open(ntlm_output_file, 'w') as file:
+                    file.write(ntlm_results)
+                print(f"NTLM Scanner results saved to {ntlm_output_file}.")
+    
     except Exception as e:
-        print(f"An error occurred during enumeration: {e}")
+        print(f"Failed to do this: {e}")
+        return
+
 if __name__ == "__main__":
     main()
