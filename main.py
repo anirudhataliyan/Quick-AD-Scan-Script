@@ -3,6 +3,13 @@ from src import search_directory
 from src import save_results
 from src import ldap_scanner
 import subprocess
+import sys
+from datetime import datetime
+
+
+filename = f"main_scan_{datetime.now():%Y%m%d_%H%M%S}.txt"
+sys.stdout = open(filename, "w")
+
 
 def run_ntlm_scanner(target, target_file=None, hashes=None):
     command = ["python", "ntlm-scanner.py", target]
