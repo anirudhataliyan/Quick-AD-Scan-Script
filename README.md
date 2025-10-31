@@ -53,7 +53,7 @@ This project can call the [Kerbrute](https://github.com/ropnop/kerbrute) binary 
 If the binary is found under src/kerbrute, you don't need to pass --kerbrute — the script will detect and use it automatically.
 The script then parses kerbrute output lines for known tokens (e.g. VALID USERNAME:) and appends results to the CSV/JSON files alongside other enumerated objects.
 
-A --kerbrute-safe flag will pass --safe to kerbrute to avoid locking accounts.
+A `--kerbrute-safe` flag will pass `--safe` to kerbrute to avoid locking accounts.
 
 ## Example CLI usage
 ```bash
