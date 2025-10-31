@@ -7,7 +7,7 @@ I made this script to make my stuff easier, I've integrated vulnerabitiy scanner
 2. Group Enumeration 
 3. Computers in network
 4. [Vulnerability scanner for relay attacks ](https://github.com/timb-machine-mirrors/GoSecure-ldap-scanner)
-5. Use [Kerbrute] (https://github.com/ropnop/kerbrute) to enumerate accounts. 
+5. Use [Kerbrute](https://github.com/ropnop/kerbrute) to enumerate accounts. 
 
 
 ## Installation
