@@ -1,210 +1,321 @@
-#!/usr/bin/env python3
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Quick-AD-Scan — PowerShell Active Directory Enumeration Tool
 
-from src.connect_to_ad import connect_to_ad
-from src.search_directory import search_directory
+.DESCRIPTION
+    A modular PowerShell toolkit for enumerating and auditing Active Directory
+    environments over LDAP. Outputs results to CSV, JSON, and optionally HTML.
+    Supports Kerbrute integration for Kerberos-based username enumeration and
+    password spraying.
 
-import subprocess
-import sys
-from datetime import datetime
-import json
-import csv
-import os
-import getpass
-import logging
+    Features:
+      • User enumeration (with locked/disabled/never-expiring flags)
+      • Group enumeration & membership
+      • Computer enumeration (OS, last logon)
+      • Organisational Unit (OU) enumeration         [NEW]
+      • Domain trust enumeration                      [NEW]
+      • Kerberoastable SPN account discovery          [NEW]
+      • Password policy audit                         [NEW]
+      • LDAP relay vulnerability check
+      • Kerbrute integration (userenum / passwordspray)
+      • Export to CSV, JSON, and HTML report          [NEW]
 
+.PARAMETER Server
+    LDAP server address, e.g. ldap://domain.com or just domain.com
 
-# ---------- Logging setup ----------
-def setup_logger(log_file):
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
-            logging.StreamHandler(sys.stdout),
-        ],
-    )
-    return logging.getLogger(__name__)
+.PARAMETER Username
+    Bind username, e.g. DOMAIN\User or user@domain.com
 
+.PARAMETER Password
+    Bind password (prompted securely if omitted)
 
-# ---------- JSON / CSV helpers ----------
-def save_to_json(data, filename):
-    with open(filename, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, ensure_ascii=False, indent=2)
+.PARAMETER SearchBase
+    LDAP search base, e.g. DC=domain,DC=com
 
+.PARAMETER KerbruteCmd
+    Kerbrute sub-command: userenum | passwordspray
 
-def save_to_csv(list_of_dicts, filename):
-    if not list_of_dicts:
-        open(filename, "w", encoding="utf-8").close()
-        return
+.PARAMETER KerbrутеPath
+    Path to kerbrute binary (auto-detected if placed in .\src\kerbrute\)
 
-    keys = set()
-    for r in list_of_dicts:
-        if isinstance(r, dict):
-            keys.update(r.keys())
-    keys = sorted(keys)
+.PARAMETER UserList
+    Path to wordlist/username list for Kerbrute operations
 
-    with open(filename, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=keys)
-        writer.writeheader()
-        for r in list_of_dicts:
-            if isinstance(r, dict):
-                writer.writerow({k: r.get(k, "") for k in keys})
+.PARAMETER Domain
+    DNS domain name used for Kerbrute (e.g. example.com)
 
+.PARAMETER Password
+    Single password for Kerbrute passwordspray
 
-# ---------- Kerbrute ----------
-def find_kerbrute(provided_path=None):
-    if provided_path:
-        if os.path.isfile(provided_path) and os.access(provided_path, os.X_OK):
-            return provided_path
-        else:
-            print(f"[!] Invalid kerbrute path: {provided_path}. Falling back to auto-detect.")
+.PARAMETER KerbrутеSafe
+    Pass --safe to kerbrute to avoid locking accounts
 
-    repo_root = os.path.dirname(os.path.abspath(__file__))
-    cand_unix = os.path.join(repo_root, "src", "kerbrute", "kerbrute")
-    cand_win  = os.path.join(repo_root, "src", "kerbrute", "kerbrute.exe")
+.PARAMETER OutputDir
+    Directory for output files (default: .\output)
 
-    for cand in (cand_unix, cand_win):
-        if os.path.isfile(cand) and os.access(cand, os.X_OK):
-            return cand
+.PARAMETER OutputFormat
+    Comma-separated list of output formats: csv,json,html (default: csv,json)
 
-    return "kerbrute"
+.PARAMETER Stealth
+    Add randomised delays between queries to reduce detection noise
 
+.EXAMPLE
+    .\main.ps1
+    # Interactive mode — prompts for all required inputs
 
-def run_kerbrute(kerbrute_path, kerbrute_cmd, domain=None, userlist=None,
-                 spray_password=None, threads=10, safe=False):
+.EXAMPLE
+    .\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com"
 
-    kb  = find_kerbrute(kerbrute_path)
-    cmd = [kb]
+.EXAMPLE
+    .\main.ps1 --kerbrute-cmd userenum --domain example.com --userlist users.txt
 
-    if kerbrute_cmd:
-        cmd.append(kerbrute_cmd)
+.NOTES
+    For educational and authorised testing purposes only.
+    Author  : converted & extended to PowerShell
+    Original: https://github.com/anirudhataliyan/Quick-AD-Scan-Script
+    Requires: No external modules — uses .NET DirectoryServices directly.
+              Optionally benefits from the ActiveDirectory RSAT module.
+#>
 
-    if domain:
-        cmd += ["-d", domain]
+[CmdletBinding()]
+param(
+    [string]$Server,
+    [string]$Username,
+    [string]$Password,
+    [string]$SearchBase,
 
-    if userlist:
-        cmd += ["--userfile", userlist]
+    # Kerbrute integration
+    [string]$KerbrутеPath,
+    [ValidateSet('userenum','passwordspray')]
+    [string]$KerbruteCmd,
+    [string]$UserList,
+    [string]$Domain,
+    [string]$KerbrutePassword,
+    [switch]$KerbrутеSafe,
 
-    if spray_password and kerbrute_cmd == "passwordspray":
-        cmd += ["--password", spray_password]
+    # Output
+    [string]$OutputDir    = ".\output",
+    [string]$OutputFormat = "csv,json",
 
-    cmd += ["-t", str(threads)]
+    # Behaviour
+    [switch]$Stealth
+)
 
-    if safe:
-        cmd += ["--safe"]
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
 
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        raise RuntimeError(f"kerbrute binary not found: {kb}")
+# ── Resolve script root so dot-sourcing works from any working directory ──────
+$ScriptRoot = $PSScriptRoot
+if (-not $ScriptRoot) { $ScriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path }
 
-    output = (proc.stdout or "") + "\n" + (proc.stderr or "")
-    parsed = []
+# ── Load feature modules ──────────────────────────────────────────────────────
+$modules = @(
+    'Enum-Users',
+    'Enum-Groups',
+    'Enum-Computers',
+    'Enum-OUs',
+    'Enum-Trusts',
+    'Enum-SPNs',
+    'Invoke-PasswordPolicyAudit',
+    'Invoke-VulnScan',
+    'Invoke-Kerbrute',
+    'Export-Results'
+)
 
-    for line in output.splitlines():
-        ln = line.strip()
-        if not ln:
-            continue
-
-        if "VALID USERNAME" in ln:
-            username = ln.split()[-1]
-            parsed.append({"source": "kerbrute", "type": "valid_user", "value": username, "raw": ln})
-
-        if "SUCCESS" in ln or "Authenticated" in ln:
-            parsed.append({"source": "kerbrute", "type": "success", "raw": ln})
-
-    return parsed, output
-
-
-# ---------- NTLM Scanner ----------
-def run_ntlm_scanner(script_path, target, target_file=None, hashes=None):
-    cmd = [sys.executable, script_path, target]
-
-    if target_file:
-        cmd += ["-target-file", target_file]
-
-    if hashes:
-        cmd += ["-hashes", hashes]
-
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        return proc.returncode, proc.stdout, proc.stderr
-    except Exception as e:
-        return 1, "", str(e)
-
-
-# ---------- Main ----------
-def main():
-
-    run_log = f"main_scan_{datetime.now():%Y%m%d_%H%M%S}.log"
-    logger = setup_logger(run_log)
-
-    logger.info("Session started.")
-    print(f"Run log: {run_log}\n")
-
-    print("Active Directory Enumerator\n")
-
-    server_address = input("LDAP server (e.g., ldap://domain.com): ").strip()
-    username       = input(r"Username (e.g., DOMAIN\User): ").strip()
-    ldap_password  = getpass.getpass("Password: ")
-
-    try:
-        print("\nConnecting...")
-        conn = connect_to_ad(server_address, username, ldap_password)
-        print("Connection successful.\n")
-        logger.info("Connected to %s as %s", server_address, username)
-    except Exception as e:
-        logger.error("Connection failed: %s", e)
-        print(f"Connection failed: {e}")
-        return
-
-    search_base = input("Search base (e.g., DC=domain,DC=com): ").strip()
-
-    try:
-        print("\nEnumerating users...")
-        users = search_directory(conn, search_base, "(objectClass=user)", ["cn", "mail", "memberOf"])
-
-        print("Enumerating groups...")
-        groups = search_directory(conn, search_base, "(objectClass=group)", ["cn", "member"])
-
-        print("Enumerating computers...")
-        computers = search_directory(conn, search_base, "(objectClass=computer)", ["cn"])
-
-        print("Enumeration complete.\n")
-
-    except Exception as e:
-        logger.error("Enumeration error: %s", e)
-        print(f"Enumeration error: {e}")
-        return
-
-    results = {
-        "users": users,
-        "groups": groups,
-        "computers": computers,
+foreach ($mod in $modules) {
+    $modPath = Join-Path $ScriptRoot "src\$mod.ps1"
+    if (Test-Path $modPath) {
+        . $modPath
+    } else {
+        Write-Warning "Module not found: $modPath"
     }
+}
 
-    print("Output format:")
-    print("1. JSON")
-    print("2. CSV")
+# ── Banner ────────────────────────────────────────────────────────────────────
+function Show-Banner {
+    $banner = @"
 
-    choice = input("Choice: ").strip()
+  ██████╗ ██╗   ██╗██╗ ██████╗██╗  ██╗      █████╗ ██████╗
+ ██╔═══██╗██║   ██║██║██╔════╝██║ ██╔╝     ██╔══██╗██╔══██╗
+ ██║   ██║██║   ██║██║██║     █████╔╝      ███████║██║  ██║
+ ██║▄▄ ██║██║   ██║██║██║     ██╔═██╗      ██╔══██║██║  ██║
+ ╚██████╔╝╚██████╔╝██║╚██████╗██║  ██╗     ██║  ██║██████╔╝
+  ╚══▀▀═╝  ╚═════╝ ╚═╝ ╚═════╝╚═╝  ╚═╝     ╚═╝  ╚═╝╚═════╝
+        ███████╗ ██████╗ █████╗ ███╗  ██╗
+        ██╔════╝██╔════╝██╔══██╗████╗ ██║
+        ███████╗██║     ███████║██╔██╗██║
+        ╚════██║██║     ██╔══██║██║╚████║
+        ███████║╚██████╗██║  ██║██║ ╚███║
+        ╚══════╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚══╝
 
-    if choice == "1":
-        filename = input("JSON filename: ").strip() or "output.json"
-        save_to_json(results, filename)
-        print(f"Saved to {filename}")
-    elif choice == "2":
-        prefix = input("CSV prefix: ").strip() or "output"
-        save_to_csv(users, f"{prefix}_users.csv")
-        save_to_csv(groups, f"{prefix}_groups.csv")
-        save_to_csv(computers, f"{prefix}_computers.csv")
-        print("CSV files saved.")
-    else:
-        print("No output saved.")
+  Quick-AD-Scan  |  PowerShell Edition
+  For authorised testing only
+"@
+    Write-Host $banner -ForegroundColor Cyan
+}
 
-    logger.info("Session finished.")
-    print("\nDone.")
+# ── Helpers ───────────────────────────────────────────────────────────────────
+function Write-Info  ([string]$msg) { Write-Host "[*] $msg" -ForegroundColor Cyan }
+function Write-OK    ([string]$msg) { Write-Host "[+] $msg" -ForegroundColor Green }
+function Write-Warn  ([string]$msg) { Write-Host "[!] $msg" -ForegroundColor Yellow }
+function Write-Fail  ([string]$msg) { Write-Host "[-] $msg" -ForegroundColor Red }
+function Write-Section([string]$t)  {
+    Write-Host "`n$('─' * 60)" -ForegroundColor DarkGray
+    Write-Host "  $t" -ForegroundColor White
+    Write-Host "$('─' * 60)" -ForegroundColor DarkGray
+}
 
+function Maybe-Sleep {
+    if ($Stealth) {
+        $delay = Get-Random -Minimum 500 -Maximum 3000
+        Start-Sleep -Milliseconds $delay
+    }
+}
 
-if __name__ == "__main__":
-    main()
+# ── Establish LDAP connection ─────────────────────────────────────────────────
+function Connect-LDAP {
+    param(
+        [string]$Server,
+        [string]$Username,
+        [string]$Password,
+        [string]$SearchBase
+    )
+
+    # Normalise server — strip ldap:// prefix for DirectoryEntry
+    $host_ = $Server -replace '^ldaps?://', ''
+
+    Write-Info "Connecting to $host_ ..."
+
+    try {
+        $path  = "LDAP://$host_/$SearchBase"
+        $entry = New-Object System.DirectoryServices.DirectoryEntry($path, $Username, $Password)
+
+        # Trigger bind by reading a property
+        $null = $entry.distinguishedName
+
+        Write-OK "Connection successful!"
+        return $entry
+    }
+    catch {
+        Write-Fail "Connection failed: $_"
+        exit 1
+    }
+}
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+Show-Banner
+
+# ── Kerbrute-only mode ────────────────────────────────────────────────────────
+if ($KerbruteCmd) {
+    Write-Section "Kerbrute Mode"
+    $kbPath = Resolve-KerbrутеPath -UserSuppliedPath $KerbrутеPath
+    if (-not $kbPath) { Write-Fail "Kerbrute binary not found. See README for setup."; exit 1 }
+
+    Invoke-KerbruteOperation `
+        -BinaryPath    $kbPath `
+        -SubCommand    $KerbruteCmd `
+        -Domain        $Domain `
+        -UserList      $UserList `
+        -Password      $KerbrutePassword `
+        -Safe:$KerbrутеSafe `
+        -OutputDir     $OutputDir
+    exit 0
+}
+
+# ── Interactive prompts for missing params ────────────────────────────────────
+Write-Host ""
+Write-Host "  Welcome to Quick-AD-Scan (PowerShell Edition)" -ForegroundColor White
+Write-Host ""
+
+if (-not $Server) {
+    $Server = Read-Host "  Enter the AD server address (e.g. ldap://domain.com)"
+}
+if (-not $Username) {
+    $Username = Read-Host "  Enter username (e.g. DOMAIN\User)"
+}
+if (-not $Password) {
+    $secPwd  = Read-Host "  Enter password" -AsSecureString
+    $bstr    = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secPwd)
+    $Password = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr)
+}
+if (-not $SearchBase) {
+    $SearchBase = Read-Host "  Enter search base (e.g. DC=domain,DC=com)"
+}
+
+# ── Connect ───────────────────────────────────────────────────────────────────
+$ldap = Connect-LDAP -Server $Server -Username $Username -Password $Password -SearchBase $SearchBase
+
+# ── Prepare output directory ──────────────────────────────────────────────────
+$null = New-Item -ItemType Directory -Force -Path $OutputDir
+$timestamp  = Get-Date -Format 'yyyyMMdd_HHmmss'
+$formats    = $OutputFormat -split ',' | ForEach-Object { $_.Trim().ToLower() }
+
+$allResults = @{}
+
+# ── Run enumeration modules ───────────────────────────────────────────────────
+Write-Section "1 / 7  User Enumeration"
+Maybe-Sleep
+$allResults['Users'] = Get-ADUsers -LdapEntry $ldap -SearchBase $SearchBase
+
+Write-Section "2 / 7  Group Enumeration"
+Maybe-Sleep
+$allResults['Groups'] = Get-ADGroups -LdapEntry $ldap -SearchBase $SearchBase
+
+Write-Section "3 / 7  Computer Enumeration"
+Maybe-Sleep
+$allResults['Computers'] = Get-ADComputers -LdapEntry $ldap -SearchBase $SearchBase
+
+Write-Section "4 / 7  Organisational Unit Enumeration"
+Maybe-Sleep
+$allResults['OUs'] = Get-ADOUs -LdapEntry $ldap -SearchBase $SearchBase
+
+Write-Section "5 / 7  Domain Trust Enumeration"
+Maybe-Sleep
+$allResults['Trusts'] = Get-ADTrusts -LdapEntry $ldap -SearchBase $SearchBase
+
+Write-Section "6 / 7  Kerberoastable SPN Accounts"
+Maybe-Sleep
+$allResults['SPNs'] = Get-KerberoastableAccounts -LdapEntry $ldap -SearchBase $SearchBase
+
+Write-Section "7 / 7  Password Policy Audit"
+Maybe-Sleep
+$allResults['PasswordPolicy'] = Get-PasswordPolicy -LdapEntry $ldap -SearchBase $SearchBase
+
+# ── Vulnerability scan ────────────────────────────────────────────────────────
+Write-Section "Vulnerability Scan — LDAP Relay Checks"
+$server_ = $Server -replace '^ldaps?://', ''
+Invoke-VulnScan -Server $server_ -SearchBase $SearchBase -Username $Username -Password $Password
+
+# ── Optional Kerbrute ─────────────────────────────────────────────────────────
+$kbPath = Resolve-KerbrутеPath -UserSuppliedPath $KerbrутеPath
+if ($kbPath) {
+    Write-Section "Kerbrute — Username Enumeration"
+    $usernames = $allResults['Users'] | ForEach-Object { $_.SamAccountName } | Where-Object { $_ }
+    $tmpList   = Join-Path $OutputDir "usernames_$timestamp.txt"
+    $usernames | Set-Content $tmpList
+    Write-OK "Username list written to $tmpList"
+
+    Invoke-KerbruteOperation `
+        -BinaryPath  $kbPath `
+        -SubCommand  'userenum' `
+        -Domain      ($Server -replace '^ldaps?://' -replace '/$') `
+        -UserList    $tmpList `
+        -Safe:$KerbrутеSafe `
+        -OutputDir   $OutputDir
+} else {
+    Write-Warn "Kerbrute not found — skipping Kerberos enumeration."
+    Write-Warn "Place binary at .\src\kerbrute\kerbrute[.exe] or pass -KerbrутеPath."
+}
+
+# ── Export ────────────────────────────────────────────────────────────────────
+Write-Section "Exporting Results"
+Export-ScanResults `
+    -Results    $allResults `
+    -OutputDir  $OutputDir `
+    -Timestamp  $timestamp `
+    -Formats    $formats
+
+Write-Host ""
+Write-OK "Scan complete. Results saved to: $OutputDir"
+Write-Host ""
