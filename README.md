@@ -1,70 +1,216 @@
-# Python LDAP Scanner
+# Quick-AD-Scan — PowerShell Edition
 
-I made this script to make my stuff easier, I've integrated vulnerabitiy scanner for **relay attacks** too, Thanks to [@timb-machine-mirrors](https://github.com/timb-machine-mirrors/GoSecure-ldap-scanner), but I didn't really checked it and repo looks old, if you guys have any other scanner, feel free to fork and try that, this is just a quick script for me, I'll add extra stuff when I came acess them, but for now I'm only using this only. And result get stored in CSV or JSON files, so it gets handy to view the overview of the network you're "enumerating". 
+> A modular, zero-dependency PowerShell toolkit for enumerating and auditing
+> Active Directory environments over LDAP.  
+> **For authorised testing only.**
 
-**This Script Incudes:**
-1. Users Enumeration
-2. Group Enumeration 
-3. Computers in network
-4. [Vulnerability scanner for relay attacks ](https://github.com/timb-machine-mirrors/GoSecure-ldap-scanner)
-5. Use [Kerbrute](https://github.com/ropnop/kerbrute) to enumerate accounts. 
+---
 
+## What Is This?
+
+This is a full PowerShell rewrite of
+[Quick-AD-Scan-Script](https://github.com/anirudhataliyan/Quick-AD-Scan-Script)
+originally written in Python. It performs the same core LDAP enumeration but
+uses only built-in .NET classes — no pip, no virtual environment, no extra
+install step. Results are exported to **CSV**, **JSON**, and a self-contained
+**HTML report** (new).
+
+---
+
+## Features
+
+| Feature | Original (Python) | This (PowerShell) |
+|---|:---:|:---:|
+| User enumeration | ✅ | ✅ |
+| Group enumeration | ✅ | ✅ |
+| Computer enumeration | ✅ | ✅ |
+| LDAP relay vuln scan | ✅ | ✅ |
+| Kerbrute integration | ✅ | ✅ |
+| OU enumeration | ❌ | ✅ **NEW** |
+| Domain trust enumeration | ❌ | ✅ **NEW** |
+| Kerberoastable SPN discovery | ❌ | ✅ **NEW** |
+| Password policy audit | ❌ | ✅ **NEW** |
+| HTML report output | ❌ | ✅ **NEW** |
+| Stealth mode (random delays) | ❌ | ✅ **NEW** |
+| Zero external dependencies | ❌ | ✅ |
+
+---
+
+## Project Structure
+
+```
+Quick-AD-Scan-PS/
+├── main.ps1                         Entry point — run this
+├── requirements.psd1                Dependency manifest (pip-equivalent)
+├── README.md                        This file
+└── src/
+    ├── Enum-Users.ps1               User account enumeration
+    ├── Enum-Groups.ps1              Group & membership enumeration
+    ├── Enum-Computers.ps1           Computer / workstation enumeration
+    ├── Enum-OUs.ps1                 Organisational Unit mapping     [NEW]
+    ├── Enum-Trusts.ps1              Domain trust enumeration        [NEW]
+    ├── Enum-SPNs.ps1                Kerberoastable SPN discovery    [NEW]
+    ├── Invoke-PasswordPolicyAudit.ps1  Password policy audit        [NEW]
+    ├── Invoke-VulnScan.ps1          LDAP relay vulnerability checks
+    ├── Invoke-Kerbrute.ps1          Kerbrute binary wrapper
+    └── Export-Results.ps1           CSV / JSON / HTML export        [NEW]
+```
+
+---
 
 ## Requirements
-1. Python 3.8+
-2. pip packages in requirements.txt
-3. (Optional) kerbrute binary. Download releases from https://github.com/ropnop/kerbrute/releases and place the binary somewhere on your PATH or provide a full path.
 
+- **PowerShell 5.1** or later (PowerShell 7+ recommended)
+- A **domain user account** — read-only access is enough for all enumeration
+- No external PowerShell modules required
+- *(Optional)* [Kerbrute](https://github.com/ropnop/kerbrute/releases) binary
+  for Kerberos-based username enumeration / password spraying
 
-## Installation
-```
-$ pip install -r requirements.txt
-$ python3 main.py
-```
+Check `requirements.psd1` for the full dependency manifest (the PowerShell
+equivalent of `requirements.txt`).
 
-## Usage
-```
-$ python main.py 
-Welcome to Active Directory Enumerator
+---
 
-Enter the Active Directory server address (e.g., ldap://domain.com): example.edu
-Enter the username (e.g., DOMAIN\\User): user1
-Enter the password: password
+## Quick Start
 
-Connection successful!
+```powershell
+# Interactive mode — prompts for all inputs
+.\main.ps1
 
-Enter the search base (e.g., DC=domain,DC=com): com
-Enumerating objects in the directory...
+# Fully CLI mode
+.\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com"
 
----- SKIPPPED ---
-```
-## Kerbrute integration (new)
-This project can call the [Kerbrute](https://github.com/ropnop/kerbrute) binary as an argument to perform fast Kerberos-based username enumeration/password spraying. There are three integration options:
+# Export CSV + JSON + HTML
+.\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com" `
+           -OutputFormat "csv,json,html"
 
-1. Path to kerbrute binary — pass --kerbrute /path/to/kerbrute and the script will call kerbrute for requested operations and capture its output.
-2. Bundled under `src/kerbrute` — if you've placed the kerbrute folder inside the src folder (for example `src/kerbrute/kerbrute`), the script will try that relative path by default when `--kerbrute` isn't provided.
-3. Kerbrute disabled — default. The script will perform only LDAP-based enumeration.
-4. The script will check the following paths (in order) when looking for the binary:
-
-1. The --kerbrute path provided by the user.
-2.`./src/kerbrute/kerbrute` (Unix) or `./src/kerbrute/kerbrute.exe` (Windows) relative to the project root.
-3. Any kerbrute on the system **PATH**.
-
-If the binary is found under src/kerbrute, you don't need to pass --kerbrute — the script will detect and use it automatically.
-The script then parses kerbrute output lines for known tokens (e.g. VALID USERNAME:) and appends results to the CSV/JSON files alongside other enumerated objects.
-
-A `--kerbrute-safe` flag will pass `--safe` to kerbrute to avoid locking accounts.
-
-## Example CLI usage
-```bash
-# Enumerate users using kerbrute (username list file created by Quick-AD-Scan-Script)
-$ python3 main.py --kerbrute ./src/kerbrute/kerbrute --kerbrute-cmd userenum --domain example.com --userlist usernames.txt
-# If you've placed kerbrute inside src/kerbrute, the script will auto-detect it and this also works:
-$ python3 main.py --kerbrute-cmd userenum --domain example.com --userlist usernames.txt
-# Password spray via kerbrute using a single password against a userlist
-$ python3 main.py --kerbrute ./src/kerbrute/kerbrute --kerbrute-cmd passwordspray --domain example.com --password 'Summer2025' --userlist usernames.txt --kerbrute-safe
+# Stealth mode (adds random delays between queries)
+.\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com" -Stealth
 ```
 
+---
 
-## Note
-I made this script for testing purpose only, please be careful and don't mess around in networks you're not allowed to. And I'll be glad if you guys help me to figure out what more I can do with this like adding new exploits and stuff, please feel free to raise issue. 
+## Kerbrute Integration
+
+Place the Kerbrute binary at `.\src\kerbrute\kerbrute.exe` (Windows) or
+`.\src\kerbrute\kerbrute` (Linux/macOS) and it will be auto-detected.
+Alternatively supply `-KerbrутеPath`.
+
+```powershell
+# Username enumeration (auto-detects kerbrute from .\src\kerbrute\)
+.\main.ps1 --kerbrute-cmd userenum --domain example.com --userlist users.txt
+
+# Password spray with account lockout protection
+.\main.ps1 -KerbruteCmd passwordspray `
+           -Domain example.com `
+           -UserList usernames.txt `
+           -KerbrutePassword 'Summer2025' `
+           -KerbrутеSafe
+
+# Supply explicit binary path
+.\main.ps1 -KerbrутеPath C:\tools\kerbrute.exe `
+           -KerbruteCmd userenum `
+           -Domain example.com `
+           -UserList users.txt
+```
+
+Kerbrute results (valid usernames / logins) are parsed from stdout and saved
+to a separate `kerbrute_results_<timestamp>.csv` in the output directory.
+
+---
+
+## Output
+
+All results are saved to `.\output\` by default.  
+Override with `-OutputDir`.
+
+| File | Description |
+|---|---|
+| `Users_<ts>.csv` | All user accounts with flags |
+| `Groups_<ts>.csv` | Groups and their members |
+| `Computers_<ts>.csv` | Domain computers |
+| `OUs_<ts>.csv` | Organisational unit tree |
+| `Trusts_<ts>.csv` | Domain trusts |
+| `SPNs_<ts>.csv` | Kerberoastable SPN accounts |
+| `PasswordPolicy_<ts>.csv` | Domain password policy |
+| `report_<ts>.html` | Single-file HTML summary report |
+| `kerbrute_results_<ts>.csv` | Valid Kerbrute results (if run) |
+
+---
+
+## New Features Explained
+
+### Kerberoastable SPN Discovery
+Identifies enabled user accounts that have a `servicePrincipalName` attribute.
+These can be targeted for offline ticket cracking. Accounts with `adminCount=1`
+are highlighted in red as high-value targets.
+
+### Password Policy Audit
+Reads the Default Domain Policy and flags weak settings:
+- Minimum password length < 12
+- Complexity disabled
+- No account lockout
+- Password max age > 365 days
+
+### Domain Trust Enumeration
+Maps all `trustedDomain` objects and classifies each by direction
+(Inbound / Outbound / Bidirectional) and type. Bidirectional trusts are
+flagged for manual review.
+
+### OU Enumeration
+Walks the entire OU tree, notes depth and hierarchy, and flags OUs that have
+Group Policy Objects (GPOs) linked.
+
+### HTML Report
+A single self-contained dark-themed HTML file summarising all scan results
+in sortable tables. Enable with `-OutputFormat "csv,json,html"`.
+
+---
+
+## Execution Policy
+
+If PowerShell blocks the script, temporarily bypass for the current session:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\main.ps1
+```
+
+Or run directly:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File .\main.ps1
+```
+
+---
+
+## Optional: RSAT Module
+
+If the `ActiveDirectory` RSAT module is available on a domain-joined machine,
+you can also use native AD cmdlets alongside this toolkit:
+
+```powershell
+# Install RSAT (Windows 10/11, requires elevation)
+Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
+
+# Then use native cmdlets
+Get-ADUser -Filter * -Properties *
+```
+
+This script does **not** require RSAT — it talks to LDAP directly via .NET.
+
+---
+
+## Disclaimer
+
+This tool is intended for **authorised security assessments only**.  
+Do not run against networks or systems you do not have explicit permission to test.  
+The author and contributors accept no liability for misuse.
+
+---
+
+## Credits
+
+- Original Python script: [@anirudhataliyan](https://github.com/anirudhataliyan/Quick-AD-Scan-Script)
+- LDAP relay scanner inspiration: [@GoSecure](https://github.com/timb-machine-mirrors/GoSecure-ldap-scanner)
+- Kerbrute: [@ropnop](https://github.com/ropnop/kerbrute)
