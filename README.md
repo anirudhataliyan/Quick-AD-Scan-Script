@@ -94,7 +94,7 @@ equivalent of `requirements.txt`).
 
 Place the Kerbrute binary at `.\src\kerbrute\kerbrute.exe` (Windows) or
 `.\src\kerbrute\kerbrute` (Linux/macOS) and it will be auto-detected.
-Alternatively supply `-KerbrутеPath`.
+Alternatively supply `-KerbrutePath`.
 
 ```powershell
 # Username enumeration (auto-detects kerbrute from .\src\kerbrute\)
@@ -105,10 +105,10 @@ Alternatively supply `-KerbrутеPath`.
            -Domain example.com `
            -UserList usernames.txt `
            -KerbrutePassword 'Summer2025' `
-           -KerbrутеSafe
+           -KerbruteSafe
 
 # Supply explicit binary path
-.\main.ps1 -KerbrутеPath C:\tools\kerbrute.exe `
+.\main.ps1 -KerbrutePath C:\tools\kerbrute.exe `
            -KerbruteCmd userenum `
            -Domain example.com `
            -UserList users.txt
