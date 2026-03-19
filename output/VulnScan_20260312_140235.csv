@@ -1,0 +1,5 @@
+"Check","Result","Detail"
+"AnonymousBind","VULNERABLE","Anonymous bind accepted"
+"LDAPSigning","POTENTIALLY_VULNERABLE","Unsigned bind accepted"
+"LDAPS","OK","Port 636 open"
+"ChannelBinding","MANUAL_CHECK","Cannot be verified remotely"

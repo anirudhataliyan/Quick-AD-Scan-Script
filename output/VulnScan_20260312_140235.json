@@ -1,0 +1,22 @@
+﻿[
+    {
+        "Check":  "AnonymousBind",
+        "Result":  "VULNERABLE",
+        "Detail":  "Anonymous bind accepted"
+    },
+    {
+        "Check":  "LDAPSigning",
+        "Result":  "POTENTIALLY_VULNERABLE",
+        "Detail":  "Unsigned bind accepted"
+    },
+    {
+        "Check":  "LDAPS",
+        "Result":  "OK",
+        "Detail":  "Port 636 open"
+    },
+    {
+        "Check":  "ChannelBinding",
+        "Result":  "MANUAL_CHECK",
+        "Detail":  "Cannot be verified remotely"
+    }
+]
