@@ -1,47 +1,47 @@
 #Requires -Version 5.1
 <#
 ================================================================================
-  requirements.psd1 — PowerShell Dependency Manifest
+  requirements.psd1 - PowerShell Dependency Manifest
   Quick-AD-Scan (PowerShell Edition)
 ================================================================================
 
   PowerShell equivalent of Python's requirements.txt.
 
-  BUILT-IN (.NET / PowerShell standard — no installation needed):
-    • System.DirectoryServices          — LDAP queries, DirectoryEntry/Searcher
-    • System.DirectoryServices.AccountManagement — optional (not used by default)
-    • System.Net.Sockets                — TCP port checks in VulnScan
-    • System.Web.HttpUtility            — HTML encoding in report
-    • Microsoft.PowerShell.Utility      — ConvertTo-Json, Export-Csv, etc.
+  BUILT-IN (.NET / PowerShell standard - no installation needed):
+    - System.DirectoryServices          - LDAP queries, DirectoryEntry/Searcher
+    - System.DirectoryServices.AccountManagement - optional (not used by default)
+    - System.Net.Sockets                - TCP port checks in VulnScan
+    - System.Web.HttpUtility            - HTML encoding in report
+    - Microsoft.PowerShell.Utility      - ConvertTo-Json, Export-Csv, etc.
 
   OPTIONAL RSAT MODULE (enables richer AD cmdlets if available):
-    • ActiveDirectory  (part of Windows RSAT)
-    • Install via:  Add-WindowsCapability -Online -Name Rsat.ActiveDirectory*
-    • Or Group Policy / DISM on domain-joined machines.
+    - ActiveDirectory  (part of Windows RSAT)
+    - Install via:  Add-WindowsCapability -Online -Name Rsat.ActiveDirectory*
+    - Or Group Policy / DISM on domain-joined machines.
 
   THIRD-PARTY BINARY (optional, for Kerbrute integration):
-    • kerbrute  — https://github.com/ropnop/kerbrute/releases
-    • Place at:  .\src\kerbrute\kerbrute.exe  (Windows)
+    - kerbrute  - https://github.com/ropnop/kerbrute/releases
+    - Place at:  .\src\kerbrute\kerbrute.exe  (Windows)
                  .\src\kerbrute\kerbrute      (Linux / macOS)
-    • Or pass:   -KerbrутеPath <full-path>
+    - Or pass:   -KerbrutePath <full-path>
 
   POWERSHELL VERSION:
-    • Minimum : Windows PowerShell 5.1
-    • Recommended : PowerShell 7+ (cross-platform, faster, better JSON support)
+    - Minimum : Windows PowerShell 5.1
+    - Recommended : PowerShell 7+ (cross-platform, faster, better JSON support)
 
   PERMISSIONS:
-    • Domain user (read-only) is sufficient for all enumeration features.
-    • No elevation or special privileges required.
-    • Some password policy fields may require Domain Admin to fully read.
+    - Domain user (read-only) is sufficient for all enumeration features.
+    - No elevation or special privileges required.
+    - Some password policy fields may require Domain Admin to fully read.
 
 ================================================================================
   QUICK SETUP
 ================================================================================
 
   1. Run PowerShell as any domain user (no admin needed for enumeration).
-  2. Optional — install RSAT for richer output:
+  2. Optional - install RSAT for richer output:
         Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
-  3. Optional — place kerbrute binary:
+  3. Optional - place kerbrute binary:
         .\src\kerbrute\kerbrute.exe
   4. Run the scan:
         .\main.ps1
@@ -53,7 +53,7 @@
     # Minimum PowerShell version required
     PowerShellVersion = '5.1'
 
-    # All functionality works without these — they are purely optional enhancements
+    # All functionality works without these - they are purely optional enhancements
     OptionalModules = @(
         @{
             ModuleName    = 'ActiveDirectory'
@@ -63,7 +63,7 @@
         }
     )
 
-    # .NET assemblies — always available, listed for documentation
+    # .NET assemblies - always available, listed for documentation
     RequiredAssemblies = @(
         'System.DirectoryServices'
         'System.DirectoryServices.AccountManagement'
