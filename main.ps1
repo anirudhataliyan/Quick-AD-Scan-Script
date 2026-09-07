@@ -94,6 +94,8 @@ $modules = @(
     'Enum-OUs',
     'Enum-Trusts',
     'Enum-SPNs',
+    'Invoke-KerberoastAudit',
+    'Invoke-ASREPRoastAudit',
     'Invoke-PasswordPolicyAudit',
     'Invoke-VulnScan',
     'Invoke-Kerbrute',
