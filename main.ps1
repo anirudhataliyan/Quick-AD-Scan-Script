@@ -1,6 +1,5 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
+<## .SYNOPSIS
     Quick-AD-Scan - PowerShell Active Directory Enumeration Tool
 
 .DESCRIPTION
@@ -198,12 +197,44 @@ try   { $results['Trusts'] = Get-ADTrusts -LdapEntry $ldap -SearchBase $SearchBa
 catch { Write-Host "[-] Trusts failed: $($_.Exception.Message)" }
 
 Maybe-Sleep
-try   { $results['SPNs'] = Get-KerberoastableAccounts -LdapEntry $ldap -SearchBase $SearchBase }
-catch { Write-Host "[-] SPNs failed: $($_.Exception.Message)" }
+try {
+    $results['SPNs'] = Get-KerberoastableAccounts `
+        -LdapEntry $ldap `
+        -SearchBase $SearchBase
+}
+catch {
+    Write-Host "[-] SPNs failed: $($_.Exception.Message)"
+}
 
 Maybe-Sleep
-try   { $results['PasswordPolicy'] = Get-PasswordPolicy -LdapEntry $ldap -SearchBase $SearchBase }
-catch { Write-Host "[-] Password policy failed: $($_.Exception.Message)" }
+try {
+    $results['KerberoastAudit'] = Invoke-KerberoastAudit `
+        -LdapEntry $ldap `
+        -SearchBase $SearchBase
+}
+catch {
+    Write-Host "[-] Kerberoast audit failed: $($_.Exception.Message)"
+}
+
+Maybe-Sleep
+try {
+    $results['ASREPRoastAudit'] = Invoke-ASREPRoastAudit `
+        -LdapEntry $ldap `
+        -SearchBase $SearchBase
+}
+catch {
+    Write-Host "[-] AS-REP audit failed: $($_.Exception.Message)"
+}
+
+Maybe-Sleep
+try {
+    $results['PasswordPolicy'] = Get-PasswordPolicy `
+        -LdapEntry $ldap `
+        -SearchBase $SearchBase
+}
+catch {
+    Write-Host "[-] Password policy failed: $($_.Exception.Message)"
+}
 
 Write-Host "[*] Running LDAP vulnerability checks..."
 try {
