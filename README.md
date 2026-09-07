@@ -263,9 +263,3 @@ This project is intended for:
 - Security assessments where you have explicit permission
 
 Do not run the scanner against networks or systems without authorization.
-
-The author and contributors are not responsible for misuse of this software.
-
-## License
-
-Add your preferred open-source license to the repository before publishing a release.
