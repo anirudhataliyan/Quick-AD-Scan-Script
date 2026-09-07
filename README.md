@@ -1,195 +1,271 @@
-# Quick-AD-Scan — PowerShell Edition
+# Quick-AD-Scan
 
-> A modular, zero-dependency PowerShell toolkit for enumerating and auditing
-> Active Directory environments over LDAP.  
-> **For authorised testing only.**
+A modular PowerShell toolkit for Active Directory enumeration and security auditing over LDAP.
 
----
+Quick-AD-Scan is designed to help security students, administrators, and authorized security testers identify potentially dangerous Active Directory configurations.
 
-## What Is This?
+> For authorized testing and defensive security assessment only.
 
-This is a full PowerShell rewrite of
-[Quick-AD-Scan-Script](https://github.com/anirudhataliyan/Quick-AD-Scan-Script)
-originally written in Python. It performs the same core LDAP enumeration but
-uses only built-in .NET classes — no pip, no virtual environment, no extra
-install step. Results are exported to **CSV**, **JSON**, and a self-contained
-**HTML report** (new).
+## Features
+
+### Active Directory Enumeration
+
+- User enumeration
+- Group and group-membership enumeration
+- Computer enumeration
+- Organizational Unit enumeration
+- Domain trust enumeration
+- Service Principal Name (SPN) discovery
+
+### Security Auditing
+
+- Password policy auditing
+- LDAP security checks
+- Kerberoasting exposure detection
+- AS-REP roasting exposure detection
+- Privileged account identification
+- Password-never-expires detection
+- Account configuration analysis
+
+### Output
+
+Results can be exported as:
+
+- CSV
+- JSON
+- HTML
+
+The HTML report provides a single self-contained report containing the collected scan results.
+
+## Kerberos Security Auditing
+
+Quick-AD-Scan currently performs two Kerberos-related exposure checks.
+
+### Kerberoasting Exposure
+
+The scanner identifies enabled user accounts with registered Service Principal Names (SPNs).
+
+Accounts with SPNs can be relevant to Kerberoasting assessments because Kerberos service authentication can expose password-derived material that may be subjected to offline password auditing.
+
+Quick-AD-Scan does not request service tickets or perform password cracking. It identifies potentially exposed account configurations.
+
+The scanner gives additional attention to:
+
+- Privileged accounts
+- Accounts with `adminCount=1`
+- Accounts configured with passwords that never expire
+- Accounts with passwords that have not been changed recently
+
+Example:
+
+```text
+[CRITICAL] svc_sql
+
+Finding:
+    Kerberoasting Exposure
+
+SPNs:
+    MSSQLSvc/sql01.example.local
+
+Privileged:
+    YES
+
+Password never expires:
+    YES
+```
+
+### AS-REP Roasting Exposure
+
+The scanner identifies enabled user accounts where Kerberos pre-authentication is disabled.
+
+This configuration can expose the account to AS-REP roasting techniques.
+
+Quick-AD-Scan only detects the configuration. It does not request AS-REP responses or attempt password cracking.
+
+Example:
+
+```text
+[HIGH] legacy_user
+
+Finding:
+    AS-REP Roasting Exposure
+
+Kerberos pre-authentication:
+    DISABLED
+
+Privileged:
+    NO
+```
 
 ## Project Structure
 
+```text
+Quick-AD-Scan-Script/
+│
+├── main.ps1
+├── README.md
+├── requirements.psd1
+│
+├── src/
+│   ├── Enum-Users.ps1
+│   ├── Enum-Groups.ps1
+│   ├── Enum-Computers.ps1
+│   ├── Enum-OUs.ps1
+│   ├── Enum-SPNs.ps1
+│   ├── Enum-Trusts.ps1
+│   │
+│   ├── Invoke-KerberoastAudit.ps1
+│   ├── Invoke-ASREPRoastAudit.ps1
+│   │
+│   ├── Invoke-PasswordPolicyAudit.ps1
+│   ├── Invoke-VulnScan.ps1
+│   ├── Invoke-Kerbrute.ps1
+│   └── Export-Results.ps1
+│
+└── output/
 ```
-Quick-AD-Scan-PS/
-├── main.ps1                         Entry point — run this
-├── requirements.psd1                Dependency manifest (pip-equivalent)
-├── README.md                        This file
-└── src/
-    ├── Enum-Users.ps1               User account enumeration
-    ├── Enum-Groups.ps1              Group & membership enumeration
-    ├── Enum-Computers.ps1           Computer / workstation enumeration
-    ├── Enum-OUs.ps1                 Organisational Unit mapping     [NEW]
-    ├── Enum-Trusts.ps1              Domain trust enumeration        [NEW]
-    ├── Enum-SPNs.ps1                Kerberoastable SPN discovery    [NEW]
-    ├── Invoke-PasswordPolicyAudit.ps1  Password policy audit        [NEW]
-    ├── Invoke-VulnScan.ps1          LDAP relay vulnerability checks
-    ├── Invoke-Kerbrute.ps1          Kerbrute binary wrapper
-    └── Export-Results.ps1           CSV / JSON / HTML export        [NEW]
-```
-
----
 
 ## Requirements
 
-- **PowerShell 5.1** or later (PowerShell 7+ recommended)
-- A **domain user account** — read-only access is enough for all enumeration
-- No external PowerShell modules required
-- *(Optional)* [Kerbrute](https://github.com/ropnop/kerbrute/releases) binary
-  for Kerberos-based username enumeration / password spraying
+- PowerShell 5.1 or later
+- Windows Active Directory environment
+- A domain account with sufficient read access
+- No external PowerShell modules are required for the LDAP enumeration and auditing modules
 
-Check `requirements.psd1` for the full dependency manifest (the PowerShell
-equivalent of `requirements.txt`).
+PowerShell 7+ is recommended where available.
 
----
+## Usage
 
-## Quick Start
+### Interactive
 
 ```powershell
-# Interactive mode — prompts for all inputs
 .\main.ps1
-
-# Fully CLI mode
-.\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com"
-
-# Export CSV + JSON + HTML
-.\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com" `
-           -OutputFormat "csv,json,html"
-
-# Stealth mode (adds random delays between queries)
-.\main.ps1 -Server domain.com -Username "DOM\admin" -SearchBase "DC=domain,DC=com" -Stealth
 ```
 
----
+The script will prompt for the LDAP server, credentials, and search base.
 
-## Kerbrute Integration
-
-Place the Kerbrute binary at `.\src\kerbrute\kerbrute.exe` (Windows) or
-`.\src\kerbrute\kerbrute` (Linux/macOS) and it will be auto-detected.
-Alternatively supply `-KerbrutePath`.
+### Command line
 
 ```powershell
-# Username enumeration (auto-detects kerbrute from .\src\kerbrute\)
-.\main.ps1 --kerbrute-cmd userenum --domain example.com --userlist users.txt
-
-# Password spray with account lockout protection
-.\main.ps1 -KerbruteCmd passwordspray `
-           -Domain example.com `
-           -UserList usernames.txt `
-           -KerbrutePassword 'Summer2025' `
-           -KerbruteSafe
-
-# Supply explicit binary path
-.\main.ps1 -KerbrutePath C:\tools\kerbrute.exe `
-           -KerbruteCmd userenum `
-           -Domain example.com `
-           -UserList users.txt
+.\main.ps1 \
+    -Server "dc01.example.local" \
+    -Username "EXAMPLE\administrator" \
+    -SearchBase "DC=example,DC=local"
 ```
 
-Kerbrute results (valid usernames / logins) are parsed from stdout and saved
-to a separate `kerbrute_results_<timestamp>.csv` in the output directory.
+### Export CSV, JSON and HTML
 
----
+```powershell
+.\main.ps1 \
+    -Server "dc01.example.local" \
+    -Username "EXAMPLE\administrator" \
+    -SearchBase "DC=example,DC=local" \
+    -OutputFormat "csv,json,html"
+```
 
-## Output
+### Custom output directory
 
-All results are saved to `.\output\` by default.  
-Override with `-OutputDir`.
+```powershell
+.\main.ps1 \
+    -Server "dc01.example.local" \
+    -Username "EXAMPLE\administrator" \
+    -SearchBase "DC=example,DC=local" \
+    -OutputDir ".\results"
+```
 
-| File | Description |
+## Example Findings
+
+A security assessment may produce results similar to:
+
+```text
+SECURITY FINDINGS
+=================
+
+[CRITICAL] AD-KERB-001
+Kerberoasting Exposure
+
+Account:
+    svc_sql
+
+Indicators:
+    Privileged account
+    Password never expires
+    Registered SPN
+
+
+[HIGH] AD-KERB-002
+AS-REP Roasting Exposure
+
+Account:
+    legacy_user
+
+Indicators:
+    Kerberos pre-authentication disabled
+```
+
+Actual results depend on the Active Directory environment being assessed.
+
+## Security Model
+
+Quick-AD-Scan is intended primarily as a read-only enumeration and security-auditing tool.
+
+The Kerberoasting and AS-REP roasting modules implemented in this project detect vulnerable directory configurations but intentionally do not:
+
+- Request Kerberos service tickets
+- Request AS-REP responses
+- Crack passwords
+- Dump credentials
+- Modify Active Directory objects
+
+This allows the scanner to identify exposure without performing credential attacks.
+
+## Existing Modules
+
+| Module | Purpose |
 |---|---|
-| `Users_<ts>.csv` | All user accounts with flags |
-| `Groups_<ts>.csv` | Groups and their members |
-| `Computers_<ts>.csv` | Domain computers |
-| `OUs_<ts>.csv` | Organisational unit tree |
-| `Trusts_<ts>.csv` | Domain trusts |
-| `SPNs_<ts>.csv` | Kerberoastable SPN accounts |
-| `PasswordPolicy_<ts>.csv` | Domain password policy |
-| `report_<ts>.html` | Single-file HTML summary report |
-| `kerbrute_results_<ts>.csv` | Valid Kerbrute results (if run) |
+| `Enum-Users.ps1` | Enumerates user accounts |
+| `Enum-Groups.ps1` | Enumerates groups and memberships |
+| `Enum-Computers.ps1` | Enumerates domain computers |
+| `Enum-OUs.ps1` | Maps organizational units |
+| `Enum-SPNs.ps1` | Discovers user accounts with SPNs |
+| `Enum-Trusts.ps1` | Enumerates domain trusts |
+| `Invoke-KerberoastAudit.ps1` | Detects Kerberoasting exposure |
+| `Invoke-ASREPRoastAudit.ps1` | Detects AS-REP roasting exposure |
+| `Invoke-PasswordPolicyAudit.ps1` | Audits password policy |
+| `Invoke-VulnScan.ps1` | Performs LDAP security checks |
+| `Invoke-Kerbrute.ps1` | Optional Kerbrute integration |
+| `Export-Results.ps1` | Exports scan results |
 
----
+## Roadmap
 
-## New Features Explained
+Planned security-auditing features include:
 
-### Kerberoastable SPN Discovery
-Identifies enabled user accounts that have a `servicePrincipalName` attribute.
-These can be targeted for offline ticket cracking. Accounts with `adminCount=1`
-are highlighted in red as high-value targets.
+- Dangerous Active Directory ACL detection
+- Delegation auditing
+- LAPS auditing
+- Privileged group analysis
+- GPO security analysis
+- LDAP signing and channel-binding analysis
+- Active Directory Certificate Services auditing
+- Risk scoring
+- Security finding correlation
+- Scan-to-scan comparison
+- Privilege relationship graphs
+- Improved HTML security dashboard
 
-### Password Policy Audit
-Reads the Default Domain Policy and flags weak settings:
-- Minimum password length < 12
-- Complexity disabled
-- No account lockout
-- Password max age > 365 days
+## Legal / Ethical Use
 
-### Domain Trust Enumeration
-Maps all `trustedDomain` objects and classifies each by direction
-(Inbound / Outbound / Bidirectional) and type. Bidirectional trusts are
-flagged for manual review.
+This project is intended for:
 
-### OU Enumeration
-Walks the entire OU tree, notes depth and hierarchy, and flags OUs that have
-Group Policy Objects (GPOs) linked.
+- Your own Active Directory lab
+- Systems you administer
+- Authorized penetration tests
+- Security assessments where you have explicit permission
 
-### HTML Report
-A single self-contained dark-themed HTML file summarising all scan results
-in sortable tables. Enable with `-OutputFormat "csv,json,html"`.
+Do not run the scanner against networks or systems without authorization.
 
----
+The author and contributors are not responsible for misuse of this software.
 
-## Execution Policy
+## License
 
-If PowerShell blocks the script, temporarily bypass for the current session:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\main.ps1
-```
-
-Or run directly:
-
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File .\main.ps1
-```
-
----
-
-## Optional: RSAT Module
-
-If the `ActiveDirectory` RSAT module is available on a domain-joined machine,
-you can also use native AD cmdlets alongside this toolkit:
-
-```powershell
-# Install RSAT (Windows 10/11, requires elevation)
-Add-WindowsCapability -Online -Name Rsat.ActiveDirectory.DS-LDS.Tools~~~~0.0.1.0
-
-# Then use native cmdlets
-Get-ADUser -Filter * -Properties *
-```
-
-This script does **not** require RSAT — it talks to LDAP directly via .NET.
-
----
-
-## Disclaimer
-
-This tool is intended for **authorised security assessments only**.  
-Do not run against networks or systems you do not have explicit permission to test.  
-The author and contributors accept no liability for misuse.
-
----
-
-## Credits
-
-- Original Python script: [@anirudhataliyan](https://github.com/anirudhataliyan/Quick-AD-Scan-Script)
-- LDAP relay scanner inspiration: [@GoSecure](https://github.com/timb-machine-mirrors/GoSecure-ldap-scanner)
-- Kerbrute: [@ropnop](https://github.com/ropnop/kerbrute)
+Add your preferred open-source license to the repository before publishing a release.
