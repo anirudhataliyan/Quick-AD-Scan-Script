@@ -15,27 +15,6 @@ uses only built-in .NET classes — no pip, no virtual environment, no extra
 install step. Results are exported to **CSV**, **JSON**, and a self-contained
 **HTML report** (new).
 
----
-
-## Features
-
-| Feature | Original (Python) | This (PowerShell) |
-|---|:---:|:---:|
-| User enumeration | ✅ | ✅ |
-| Group enumeration | ✅ | ✅ |
-| Computer enumeration | ✅ | ✅ |
-| LDAP relay vuln scan | ✅ | ✅ |
-| Kerbrute integration | ✅ | ✅ |
-| OU enumeration | ❌ | ✅ **NEW** |
-| Domain trust enumeration | ❌ | ✅ **NEW** |
-| Kerberoastable SPN discovery | ❌ | ✅ **NEW** |
-| Password policy audit | ❌ | ✅ **NEW** |
-| HTML report output | ❌ | ✅ **NEW** |
-| Stealth mode (random delays) | ❌ | ✅ **NEW** |
-| Zero external dependencies | ❌ | ✅ |
-
----
-
 ## Project Structure
 
 ```
