@@ -84,6 +84,4 @@ output directory.
 
 ---
 
-## License
 
-Add your preferred open-source license to the repository before publishing a release.
