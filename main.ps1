@@ -97,6 +97,11 @@ $modules = @(
     'Invoke-PasswordPolicyAudit',
     'Invoke-VulnScan',
     'Invoke-Kerbrute',
+    'Invoke-DangerousACLAudit',
+    'Invoke-GPOSecurityAudit',
+    'Build-PrivilegeGraph',
+    'Find-SecurityFindings',
+    'Invoke-RiskScoring',
     'Export-Results'
 )
 
@@ -202,6 +207,34 @@ catch { Write-Host "[-] SPNs failed: $($_.Exception.Message)" }
 Maybe-Sleep
 try   { $results['PasswordPolicy'] = Get-PasswordPolicy -LdapEntry $ldap -SearchBase $SearchBase }
 catch { Write-Host "[-] Password policy failed: $($_.Exception.Message)" }
+
+Maybe-Sleep
+try {
+    $results['DangerousACLs'] = Invoke-DangerousACLAudit -LdapEntry $ldap -SearchBase $SearchBase
+}
+catch { Write-Host "[-] Dangerous ACL audit failed: $($_.Exception.Message)" }
+
+Maybe-Sleep
+try {
+    $results['GPOAudit'] = Invoke-GPOSecurityAudit -LdapEntry $ldap -SearchBase $SearchBase
+}
+catch { Write-Host "[-] GPO audit failed: $($_.Exception.Message)" }
+
+Maybe-Sleep
+try {
+    $results['PrivilegeGraph'] = Build-PrivilegeGraph -LdapEntry $ldap -SearchBase $SearchBase
+}
+catch { Write-Host "[-] Privilege graph failed: $($_.Exception.Message)" }
+
+# Consolidate findings & scoring
+try {
+    $findings = Find-SecurityFindings -Results $results
+    $results['Findings'] = $findings
+
+    $scores = Invoke-RiskScoring -Findings $findings
+    $results['RiskScores'] = $scores
+}
+catch { Write-Host "[-] Finding / scoring pipeline failed: $($_.Exception.Message)" }
 
 Write-Host "[*] Running LDAP vulnerability checks..."
 try {
