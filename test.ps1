@@ -40,56 +40,69 @@ Write-Host "[*] Loading modules..." -ForegroundColor Yellow
 . .\src\Build-PrivilegeGraph.ps1
 . .\src\Invoke-RiskScoring.ps1
 . .\src\Export-Results.ps1
-Write-Host "✓ All modules loaded`n" -ForegroundColor Green
+Write-Host "✓ All modules loaded" -ForegroundColor Green
+Write-Host ""
 
 # Run all tests
 Write-Host "[1/12] Enumerating Users..." -ForegroundColor Yellow
 $users = Get-ADUsers -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($users.Count) users`n" -ForegroundColor Green
+Write-Host "✓ Found $($users.Count) users" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[2/12] Enumerating Computers..." -ForegroundColor Yellow
 $computers = Get-ADComputers -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($computers.Count) computers`n" -ForegroundColor Green
+Write-Host "✓ Found $($computers.Count) computers" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[3/12] Enumerating Groups..." -ForegroundColor Yellow
 $groups = Get-ADGroups -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($groups.Count) groups`n" -ForegroundColor Green
+Write-Host "✓ Found $($groups.Count) groups" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[4/12] Enumerating OUs..." -ForegroundColor Yellow
 $ous = Get-ADOUs -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($ous.Count) OUs`n" -ForegroundColor Green
+Write-Host "✓ Found $($ous.Count) OUs" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[5/12] Enumerating SPNs..." -ForegroundColor Yellow
 $spns = Get-KerberoastableAccounts -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($spns.Count) SPNs`n" -ForegroundColor Green
+Write-Host "✓ Found $($spns.Count) SPNs" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[6/12] Enumerating Trusts..." -ForegroundColor Yellow
 $trusts = Get-ADTrusts -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($trusts.Count) trusts`n" -ForegroundColor Green
+Write-Host "✓ Found $($trusts.Count) trusts" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[7/12] Kerberoast Audit..." -ForegroundColor Yellow
 $kerberoast = Invoke-KerberoastAudit -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($kerberoast.Count) kerberoastable accounts`n" -ForegroundColor Green
+Write-Host "✓ Found $($kerberoast.Count) kerberoastable accounts" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[8/12] AS-REP Roast Audit..." -ForegroundColor Yellow
 $asrep = Invoke-ASREPRoastAudit -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($asrep.Count) AS-REP roastable accounts`n" -ForegroundColor Green
+Write-Host "✓ Found $($asrep.Count) AS-REP roastable accounts" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[9/12] Password Policy Audit..." -ForegroundColor Yellow
 $pwPolicy = Get-PasswordPolicy -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Completed`n" -ForegroundColor Green
+Write-Host "✓ Completed" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[10/12] Dangerous ACL Audit..." -ForegroundColor Yellow
 $dangerousACLs = Invoke-DangerousACLAudit -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($dangerousACLs.Count) issues`n" -ForegroundColor Green
+Write-Host "✓ Found $($dangerousACLs.Count) issues" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[11/12] GPO Security Audit..." -ForegroundColor Yellow
 $gpoAudit = Invoke-GPOSecurityAudit -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($gpoAudit.Count) GPO issues`n" -ForegroundColor Green
+Write-Host "✓ Found $($gpoAudit.Count) GPO issues" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[12/12] Vulnerability Scan..." -ForegroundColor Yellow
 $vulnScan = Invoke-VulnScan -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Found $($vulnScan.Count) vulnerabilities`n" -ForegroundColor Green
+Write-Host "✓ Found $($vulnScan.Count) vulnerabilities" -ForegroundColor Green
+Write-Host ""
 
 # Consolidate results
 $results = @{
@@ -110,15 +123,18 @@ $results = @{
 # Generate findings and report
 Write-Host "[+] Generating Security Findings..." -ForegroundColor Yellow
 $findings = Find-SecurityFindings -Results $results
-Write-Host "✓ Found $($findings.Count) security findings`n" -ForegroundColor Green
+Write-Host "✓ Found $($findings.Count) security findings" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[+] Building Privilege Graph..." -ForegroundColor Yellow
 $privGraph = Build-PrivilegeGraph -LdapEntry $LdapEntry -SearchBase $SearchBase
-Write-Host "✓ Generated privilege graph`n" -ForegroundColor Green
+Write-Host "✓ Generated privilege graph" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "[+] Calculating Risk Scores..." -ForegroundColor Yellow
 $riskScores = Invoke-RiskScoring -Findings $findings
-Write-Host "✓ Risk scores calculated`n" -ForegroundColor Green
+Write-Host "✓ Risk scores calculated" -ForegroundColor Green
+Write-Host ""
 
 # Export to HTML
 $results['Findings'] = $findings
@@ -127,7 +143,8 @@ $results['PrivilegeGraph'] = $privGraph
 
 Write-Host "[+] Exporting HTML Report..." -ForegroundColor Yellow
 Export-Results -Results $results -OutputPath ".\AD_Scan_Report.html"
-Write-Host "✓ Report saved to: .\AD_Scan_Report.html`n" -ForegroundColor Green
+Write-Host "✓ Report saved to: .\AD_Scan_Report.html" -ForegroundColor Green
+Write-Host ""
 
 Write-Host "=== SCAN COMPLETE ===" -ForegroundColor Cyan
 Write-Host "Summary:" -ForegroundColor Cyan
