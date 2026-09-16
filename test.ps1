@@ -1,19 +1,26 @@
 # Set execution policy first
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
 
+# Load System.Web for HtmlEncode
+Add-Type -AssemblyName System.Web
+
 # Setup
 $adServer = "ldap://WIN-A4EILT2H9KP.quickad.local"
+$domain = "quickad.local"
 $username = "QUICKAD\Administrator"
 $password = "Qwertyuiop@123"
 
-# Create connection
+# Create connection with proper authentication
 try {
     $LdapEntry = New-Object System.DirectoryServices.DirectoryEntry($adServer, $username, $password)
-    $null = $LdapEntry.NativeObject
-    $SearchBase = $LdapEntry.DistinguishedName
+    # Force authentication
+    $LdapEntry.RefreshCache()
+    
+    $SearchBase = "DC=" + ($domain -split '\.' -join ',DC=')
     
     Write-Host "Connected to: $adServer" -ForegroundColor Green
     Write-Host "Search Base: $SearchBase" -ForegroundColor Green
+    Write-Host "Authenticated as: $username" -ForegroundColor Green
     Write-Host ""
 }
 catch {
@@ -99,7 +106,7 @@ Write-Host "Found $($gpoAudit.Count) GPO issues" -ForegroundColor Green
 Write-Host ""
 
 Write-Host "[12/12] Vulnerability Scan..." -ForegroundColor Yellow
-$vulnScan = Invoke-VulnScan -LdapEntry $LdapEntry -SearchBase $SearchBase
+$vulnScan = Invoke-VulnScan -SearchBase $SearchBase
 Write-Host "Found $($vulnScan.Count) vulnerabilities" -ForegroundColor Green
 Write-Host ""
 
