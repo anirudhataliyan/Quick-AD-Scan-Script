@@ -41,7 +41,7 @@ function Find-SecurityFindings {
     # Kerberoast findings
     if ($Results.ContainsKey('KerberoastAudit')) {
         foreach ($r in @($Results['KerberoastAudit'])) {
-            $sev = $r.Severity ? $r.Severity : 'Medium'
+            $sev = if ($r.Severity) { $r.Severity } else { 'Medium' }
             Add-Finding "Kerberoast exposure: $($r.SamAccountName)" $sev 'KerberoastAudit' $r.SamAccountName ($r | ConvertTo-Json -Depth 3)
         }
     }
@@ -49,7 +49,7 @@ function Find-SecurityFindings {
     # AS-REP findings
     if ($Results.ContainsKey('ASREPRoastAudit')) {
         foreach ($r in @($Results['ASREPRoastAudit'])) {
-            $sev = $r.Severity ? $r.Severity : 'High'
+            $sev = if ($r.Severity) { $r.Severity } else { 'High' }
             Add-Finding "AS-REP exposure: $($r.SamAccountName)" $sev 'ASREPRoastAudit' $r.SamAccountName ($r | ConvertTo-Json -Depth 3)
         }
     }
