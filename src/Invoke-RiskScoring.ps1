@@ -13,11 +13,19 @@
 function Invoke-RiskScoring {
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][array]$Findings
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [array]$Findings = @()
     )
 
+    if ($null -eq $Findings -or $Findings.Count -eq 0) {
+        return @()
+    }
+
     $scored = @()
-    foreach ($f in $Findings) {
+    foreach ($f in @($Findings)) {
+        if ($null -eq $f) { continue }
+
         $base = switch ($f.Severity.ToLower()) {
             'critical' { 90 }
             'high'     { 70 }
